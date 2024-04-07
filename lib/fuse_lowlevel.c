@@ -2071,7 +2071,7 @@ void do_init(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	 */
 
 	se->conn.time_gran = 1;
-	
+
 	if (bufsize < FUSE_MIN_READ_BUFFER) {
 		fuse_log(FUSE_LOG_ERR, "fuse: warning: buffer size too small: %zu\n",
 			bufsize);
@@ -2872,6 +2872,7 @@ int fuse_session_receive_buf_int(struct fuse_session *se, struct fuse_buf *buf,
 
 	if (llp->size < bufsize) {
 		if (llp->can_grow) {
+
 			res = fcntl(llp->pipe[0], F_SETPIPE_SZ, bufsize);
 			if (res == -1) {
 				llp->can_grow = 0;

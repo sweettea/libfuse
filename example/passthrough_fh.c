@@ -47,6 +47,8 @@
 #endif
 #include <sys/file.h> /* flock(2) */
 
+static struct fuse_conn_info_opts *argys;
+
 static void *xmp_init(struct fuse_conn_info *conn,
 		      struct fuse_config *cfg)
 {
@@ -58,7 +60,7 @@ static void *xmp_init(struct fuse_conn_info *conn,
 	   To make parallel_direct_writes valid, need either set cfg->direct_io
 	   in current function (recommended in high level API) or set fi->direct_io
 	   in xmp_create() or xmp_open(). */
-	// cfg->direct_io = 1;
+	//cfg->direct_io = 1;
 	cfg->parallel_direct_writes = 1;
 
 	/* Pick up changes from lower filesystem right away. This is
@@ -68,9 +70,13 @@ static void *xmp_init(struct fuse_conn_info *conn,
 	   the cache of the associated inode - resulting in an
 	   incorrect st_nlink value being reported for any remaining
 	   hardlinks to this inode. */
-	cfg->entry_timeout = 0;
-	cfg->attr_timeout = 0;
-	cfg->negative_timeout = 0;
+	//cfg->entry_timeout = 0;
+	//cfg->attr_timeout = 0;
+	//cfg->negative_timeout = 0;
+
+	conn->max_read = 4096;
+	fuse_apply_conn_info_opts(argys, conn);
+	fuse_log(FUSE_LOG_ERR, "ll_init: %llu / %llu", conn->max_read, conn->max_write);
 
 	return NULL;
 }
@@ -384,6 +390,8 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 	if (fd == -1)
 		return -errno;
 
+	fuse_log(FUSE_LOG_ERR, "open\n");
+
         /* Enable direct_io when open has flags O_DIRECT to enjoy the feature
            parallel_direct_writes (i.e., to get a shared lock, not exclusive lock,
            for writes to the same file). */
@@ -434,28 +442,33 @@ static int xmp_read_buf(const char *path, struct fuse_bufvec **bufp,
 static int xmp_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi)
 {
-	int res;
-
+	fuse_log(FUSE_LOG_ERR, "%llu\n", size);
 	(void) path;
-	res = pwrite(fi->fh, buf, size, offset);
-	if (res == -1)
-		res = -errno;
+	(void) offset;
+	(void) fi;
+	unsigned long long zero = 0;
+	for (int i = 0; i < size / 8; i++)
+		zero |= memcmp(buf + i * 8, &zero, 8);
 
-	return res;
+	return 0;
 }
 
 static int xmp_write_buf(const char *path, struct fuse_bufvec *buf,
 		     off_t offset, struct fuse_file_info *fi)
 {
-	struct fuse_bufvec dst = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
-
+	size_t size = fuse_buf_size(buf);
 	(void) path;
+	(void) offset;
+	(void) fi;
 
-	dst.buf[0].flags = FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK;
-	dst.buf[0].fd = fi->fh;
-	dst.buf[0].pos = offset;
+	unsigned long long zero = 0;
+	for(int i = 0; i < buf->count; i++) {
+		struct fuse_buf *this = &buf->buf[i];
+		for (int j = 0; j < this->size / 8; j++)
+			zero |= memcmp(this->mem + j * 8, &zero, 8);
+	}
 
-	return fuse_buf_copy(&dst, buf, FUSE_BUF_SPLICE_NONBLOCK);
+	return size;
 }
 
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
@@ -671,6 +684,9 @@ static const struct fuse_operations xmp_oper = {
 
 int main(int argc, char *argv[])
 {
+	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+	argys = fuse_parse_conn_info_opts(&args);
 	umask(0);
-	return fuse_main(argc, argv, &xmp_oper, NULL);
+	fuse_log(FUSE_LOG_ERR, "party\n");
+	return fuse_main(args.argc, args.argv, &xmp_oper, NULL);
 }

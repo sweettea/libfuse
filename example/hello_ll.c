@@ -201,11 +201,24 @@ static void hello_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	}
 }
 
+static void hello_ll_init(void *userdata, struct fuse_conn_info *conn)
+{
+	conn->max_write = getpagesize() * (1<<7);
+	fuse_log(FUSE_LOG_ERR, "ll_init: %llu / %llu", conn->max_read, conn->max_write);
+}
+
+static void hello_ll_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
+{
+	return;
+}
+
 static const struct fuse_lowlevel_ops hello_ll_oper = {
+	.init = hello_ll_init,
 	.lookup = hello_ll_lookup,
 	.getattr = hello_ll_getattr,
 	.readdir = hello_ll_readdir,
 	.open = hello_ll_open,
+	.unlink = hello_ll_unlink,
 	.read = hello_ll_read,
 	.setxattr = hello_ll_setxattr,
 	.getxattr = hello_ll_getxattr,

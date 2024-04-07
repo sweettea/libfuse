@@ -191,7 +191,7 @@ int fuse_session_loop_mt_312(struct fuse_session *se, struct fuse_loop_config *c
 int fuse_loop_cfg_verify(struct fuse_loop_config *config);
 
 
-#define FUSE_MAX_MAX_PAGES 256
+#define FUSE_MAX_MAX_PAGES 8192
 #define FUSE_DEFAULT_MAX_PAGES_PER_REQ 32
 
 /* room needed in buffer to accommodate header */
